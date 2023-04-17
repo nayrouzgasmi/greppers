@@ -1,8 +1,13 @@
 package tn.esprit.pidev.Security.Payload.Response;
 
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import java.util.List;
-
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class JwtResponse {
     private String token;
     private String type = "Bearer";
@@ -12,12 +17,18 @@ public class JwtResponse {
     private String phone_number;
     private List<String> roles;
 
-    public JwtResponse(String accessToken, Long id, String username, String email,String phone_number, List<String> roles) {
-        this.token = accessToken;
+    public JwtResponse(String token, String username) {
+        this.token = token;
+        this.username = username;
+    }
+
+    public JwtResponse(String token, Long id, String username, String email, String phone_number, List<String> roles) {
+        this.token = token;
+
         this.id = id;
         this.username = username;
         this.email = email;
-        this.phone_number=phone_number;
+        this.phone_number = phone_number;
         this.roles = roles;
     }
 

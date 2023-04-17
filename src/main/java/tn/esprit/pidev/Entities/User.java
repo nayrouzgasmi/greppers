@@ -1,5 +1,7 @@
 package tn.esprit.pidev.Entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import javax.persistence.*;
 import javax.validation.constraints.Email;
 import javax.validation.constraints.NotBlank;
@@ -36,11 +38,19 @@ public class User {
     @Size(max = 20)
     private String phone_number;
 
+    @Column(name="active")
+    private int active;
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(	name = "user_roles",
             joinColumns = @JoinColumn(name = "user_id"),
             inverseJoinColumns = @JoinColumn(name = "role_id"))
     private Set<Role> roles = new HashSet<>();
+
+    @OneToOne(cascade = CascadeType.ALL,fetch = FetchType.EAGER)
+    @JsonIgnore
+    @JoinColumn(name="code_id")
+    private Code code;
 
     public User() {
     }
@@ -50,6 +60,22 @@ public class User {
         this.email = email;
         this.password = password;
         this.phone_number=phone_number;
+    }
+
+    public int getActive() {
+        return active;
+    }
+
+    public void setActive(int active) {
+        this.active = active;
+    }
+
+    public Code getCode() {
+        return code;
+    }
+
+    public void setCode(Code code) {
+        this.code = code;
     }
 
     public Long getId() {

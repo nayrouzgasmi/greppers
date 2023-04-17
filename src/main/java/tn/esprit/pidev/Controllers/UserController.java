@@ -8,17 +8,20 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import tn.esprit.pidev.Entities.Code;
 import tn.esprit.pidev.Entities.ERole;
 import tn.esprit.pidev.Entities.Role;
 import tn.esprit.pidev.Entities.User;
 import tn.esprit.pidev.Repositories.RoleRepository;
 import tn.esprit.pidev.Repositories.UserRepository;
 import tn.esprit.pidev.Security.Jwt.JwtUtils;
-import tn.esprit.pidev.Security.Payload.Request.LoginRequest;
-import tn.esprit.pidev.Security.Payload.Request.SignupRequest;
+import tn.esprit.pidev.Security.Payload.Request.*;
 import tn.esprit.pidev.Security.Payload.Response.JwtResponse;
 import tn.esprit.pidev.Security.Payload.Response.MessageResponse;
+import tn.esprit.pidev.Services.EmailServiceImpl;
+import tn.esprit.pidev.Services.UserCode;
 import tn.esprit.pidev.Services.UserDetailsImpl;
+import tn.esprit.pidev.Services.UserDetailsServiceImpl;
 
 import javax.validation.Valid;
 import java.util.HashSet;
@@ -26,7 +29,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-@CrossOrigin(origins = "*", maxAge = 3600)
+@CrossOrigin(value = "http://localhost:4200")
 @RestController
 @RequestMapping("/api/auth")
 public class UserController {
@@ -45,6 +48,10 @@ public class UserController {
 
     @Autowired
     JwtUtils jwtUtils;
+    @Autowired
+    EmailServiceImpl emailService;
+    @Autowired
+    UserDetailsServiceImpl userDetailsService;
 
     @GetMapping("/username")
     public String getUserEmail(Authentication authentication) {
@@ -103,6 +110,23 @@ public class UserController {
                     .badRequest()
                     .body(new MessageResponse("Error: Please choose role!"));
         }
+
+        if (strRoles.contains("Client")){
+            Role client = roleRepository.findByName(ERole.Client)
+                    .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
+            roles.add(client);
+            user.setRoles(roles);
+            String myCode = UserCode.getCode();
+            Mail mail = new Mail(signUpRequest.getEmail(),myCode);
+            emailService.sendCodeByMail(mail);
+            user.setActive(0);
+            Code code=new Code();
+            code.setCode(myCode);
+            user.setCode(code);
+            userRepository.save(user);
+            return ResponseEntity.ok(new MessageResponse("New Doctor registered successfully!"));
+
+        }
         if (strRoles.contains("Marchant")){
             Role patient = roleRepository.findByName(ERole.Marchant)
                     .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
@@ -113,23 +137,15 @@ public class UserController {
 
         }
         if (strRoles.contains("Admin")){
-            Role patient = roleRepository.findByName(ERole.Admin)
+            Role admin = roleRepository.findByName(ERole.Admin)
                     .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
-            roles.add(patient);
+            roles.add(admin);
             user.setRoles(roles);
             userRepository.save(user);
             return ResponseEntity.ok(new MessageResponse("New Admin registered successfully!"));
 
         }
-        if (strRoles.contains("Client")){
-            Role patient = roleRepository.findByName(ERole.Client)
-                    .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
-            roles.add(patient);
-            user.setRoles(roles);
-            userRepository.save(user);
-            return ResponseEntity.ok(new MessageResponse("New Doctor registered successfully!"));
 
-        }
         else {
 
             return ResponseEntity
@@ -137,7 +153,68 @@ public class UserController {
                     .body(new MessageResponse("Error:Select Valid role!"));
         }}
 
+    @PostMapping("/active")
+    public UserActive getActiveUser(@RequestBody LoginRequest jwtLogin){
+        String enPassword = userDetailsService.getPasswordByEmail(jwtLogin.getEmail());  // from DB
+        boolean result = encoder.matches(jwtLogin.getPassword(),enPassword); // Sure
+        UserActive userActive = new UserActive();
+        if (result){
+            int act = userDetailsService.getUserActive(jwtLogin.getEmail());
+            if(act == 0){
+                String code = UserCode.getCode();
+                Mail mail = new Mail(jwtLogin.getEmail(),code);
+                emailService.sendCodeByMail(mail);
+                User user = userDetailsService.getUserByMail(jwtLogin.getEmail());
+                user.getCode().setCode(code);
+                userDetailsService.editUser(user);
+            }
+            userActive.setActive(act);
+        } else {
+            userActive.setActive(-1);
+        }
+        return userActive;
+    }
 
+    // http://localhost:8080/activated
+    @PostMapping("/activated")
+    public ResponseEntity<?> activeAccount(@RequestBody ActiveAccount activeAccount){
+        User user = userDetailsService.getUserByMail(activeAccount.getMail());
+
+        if(user.getCode().getCode().equals(activeAccount.getCode())){
+            user.setActive(1);
+            userDetailsService.editUser(user);
+            return ResponseEntity
+                    .ok(new MessageResponse("Account Active!"));        }
+        else {
+            return ResponseEntity
+                    .badRequest()
+                    .body(new MessageResponse("Account not active!"));
+        }
+    }
+    // http://localhost:8080/resetPassword
+    @PostMapping("/resetPassword")
+    public ResponseEntity<?>  resetPassword(@RequestBody NewPassword newPassword){
+        User user = this.userDetailsService.getUserByMail(newPassword.getEmail());
+        if(user != null){
+            if(user.getCode().getCode().equals(newPassword.getCode())){
+                user.setPassword(encoder.encode(newPassword.getPassword()));
+                userDetailsService.addUser(user);
+                return ResponseEntity
+
+                        .ok(new MessageResponse("Password changed!"));
+            } else {
+
+                return ResponseEntity
+                        .badRequest()
+                        .body(new MessageResponse("Error while changing password!"));
+            }
+        } else {
+            return ResponseEntity
+                    .badRequest()
+                    .body(new MessageResponse("Email does not exist!"));
+        }
+
+    }
 
 }
 

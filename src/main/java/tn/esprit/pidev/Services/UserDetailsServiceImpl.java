@@ -23,4 +23,31 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         return UserDetailsImpl.build(user);
     }
 
+
+    @Transactional
+    public void addUser(User user){
+        userRepository.save(user);
+    }
+
+    public boolean ifEmailExist(String email){
+        return userRepository.existsByEmail(email);
+    }
+
+    @Transactional
+    public int getUserActive(String email){
+        return userRepository.getActive(email);
+    }
+
+    @Transactional
+    public String getPasswordByEmail(String email){
+        return userRepository.getPasswordByEmail(email);
+    }
+
+    public User getUserByMail(String mail){
+        return this.userRepository.findByemail(mail);
+    }
+    public void editUser(User user){
+        this.userRepository.save(user);
+    }
+
 }

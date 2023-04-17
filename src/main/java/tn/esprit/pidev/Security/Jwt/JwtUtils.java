@@ -4,9 +4,15 @@ package tn.esprit.pidev.Security.Jwt;
 import io.jsonwebtoken.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import tn.esprit.pidev.Security.Payload.Request.LoginRequest;
+import tn.esprit.pidev.Security.Payload.Response.JwtResponse;
 import tn.esprit.pidev.Services.UserDetailsImpl;
 
 import java.util.Date;
@@ -21,6 +27,8 @@ public class JwtUtils {
     @Value("${bezkoder.app.jwtExpirationMs}")
     private int jwtExpirationMs;
 
+    @Autowired
+    AuthenticationManager authenticationManager;
     public String generateJwtToken(Authentication authentication) {
 
         UserDetailsImpl userPrincipal = (UserDetailsImpl) authentication.getPrincipal();
@@ -54,5 +62,14 @@ public class JwtUtils {
         }
 
         return false;
+    }
+
+
+    public JwtResponse login(LoginRequest jwtLogin) {
+        Authentication authenticate = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(jwtLogin.getUsername(),
+                jwtLogin.getPassword()));
+        SecurityContextHolder.getContext().setAuthentication(authenticate);
+        String token = generateJwtToken(authenticate);
+        return new JwtResponse(jwtLogin.getUsername(),token);
     }
 }
